@@ -6662,6 +6662,7 @@ SOCK *ProxyConnectEx2(CONNECTION *c, char *proxy_host_name, UINT proxy_port,
 				   bool *cancel_flag, void *hWnd, UINT timeout)
 {
 	SOCK *s = NULL;
+	CLIENT_OPTION *o = NULL;
 	bool use_auth = false;
 	char tmp[MAX_SIZE];
 	char auth_tmp_str[MAX_SIZE], auth_b64_str[MAX_SIZE * 2];
@@ -6740,11 +6741,47 @@ SOCK *ProxyConnectEx2(CONNECTION *c, char *proxy_host_name, UINT proxy_port,
 	}
 
 	h = NewHttpHeader("CONNECT", tmp, "HTTP/1.0");
-	AddHttpValue(h, NewHttpValue("User-Agent", (c->Cedar == NULL ? DEFAULT_USER_AGENT : c->Cedar->HttpUserAgent)));
-	AddHttpValue(h, NewHttpValue("Host", server_host_name_tmp));
-	AddHttpValue(h, NewHttpValue("Content-Length", "0"));
-	AddHttpValue(h, NewHttpValue("Proxy-Connection", "Keep-Alive"));
-	AddHttpValue(h, NewHttpValue("Pragma", "no-cache"));
+
+	o = c->Session->ClientOption;
+
+	if (IsEmptyStr(o->ProxyHttpHeader) == false)
+	{
+		TOKEN_LIST *tokens = ParseToken(o->ProxyHttpHeader, ";");
+		if (tokens != NULL)
+		{
+			for (i = 0; i < tokens->NumTokens; i++)
+			{
+				AddHttpValueStr(h, tokens->Token[i]);
+			}
+
+			FreeToken(tokens);
+		}
+	}
+
+	if (GetHttpValue(h, "User-Agent") == NULL)
+	{
+		AddHttpValue(h, NewHttpValue("User-Agent", (c->Cedar == NULL ? DEFAULT_USER_AGENT : c->Cedar->HttpUserAgent)));
+	}
+
+	if (GetHttpValue(h, "Host") == NULL)
+	{
+		AddHttpValue(h, NewHttpValue("Host", server_host_name_tmp));
+	}
+
+	if (GetHttpValue(h, "Content-Length") == NULL)
+	{
+		AddHttpValue(h, NewHttpValue("Content-Length", "0"));
+	}
+
+	if (GetHttpValue(h, "Proxy-Connection") == NULL)
+	{
+		AddHttpValue(h, NewHttpValue("Proxy-Connection", "Keep-Alive"));
+	}
+
+	if (GetHttpValue(h, "Pragma") == NULL)
+	{
+		AddHttpValue(h, NewHttpValue("Pragma", "no-cache"));
+	}
 
 	if (use_auth)
 	{

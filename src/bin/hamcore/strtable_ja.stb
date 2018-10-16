@@ -939,6 +939,8 @@ CM_STOP_INST_VLAN_1		このコンピュータで仮想 LAN カードのインス
 CM_STOP_INST_VLAN_2		このコンピュータで仮想 LAN カードのインストール作業を行うには、「コンソールセッション」 上で VPN クライアント接続マネージャを起動する必要があります。\r\n\r\n現在、このコンピュータには%sがインストールされており、現在のユーザーはコンソールセッションではなくリモートセッション (セッション ID: %u) としてログオンしています。\r\n仮想 LAN カードのインストール作業を行うには、コンソールセッション上で VPN クライアント接続マネージャを起動する必要があります。\r\n(現在、コンソールセッション (セッション ID: 0) にはユーザーがログオンしていません。)\r\n\r\nユーザーの切り替え機能を使用するか、リモートデスクトップの /console スイッチ機能を使用するか、またはコンピュータのローカルコンソールデバイスを使用してコンピュータにローカルログオンしてから VPN クライアント接続マネージャを起動し、仮想 LAN カードのインストール作業を行ってください。
 CM_SHORTCUT_DESKTOP_MSG	接続設定へのショートカットを使用して接続を開始するには、「コンソールセッション」上でショートカットファイルを起動する必要があります。\r\n\r\n現在のユーザーはコンソールセッションではなくリモートセッション (セッション ID: %u) としてログオンしています。
 CM_HTTP_PROXY_WARNING	[HTTP プロキシサーバー経由接続] が選択されています。\r\n\r\n多くの場合、HTTP プロキシサーバーは接続先サーバーのポート番号として、HTTP プロトコル (TCP ポート 80 番) および HTTPS プロトコル (TCP ポート 443 番) の 2 種類の TCP ポートに対する接続のみを許可しています。\r\n(プロキシサーバーが任意の TCP ポートに対する接続を許可している場合もあります。)\r\n\r\nHTTP ポートまたは HTTPS ポート以外へのサーバー ポートへの接続を禁止している HTTP プロキシサーバーを経由して VPN 接続を行う場合は、接続先 VPN Server のポート番号は 443 (HTTPS プロトコル) に指定する必要があります。\r\n\r\n経由する HTTP プロキシサーバーが 80 番または 443 番ポート以外への接続を許可しているかどうかを確認するには、HTTP プロキシサーバーの管理者にお問い合わせください。\r\n\r\n現在、接続先 VPN Server のポート番号は %d が指定されていますが、ポート番号を 443 番 (HTTPS プロトコル) に変更しますか?\r\n(接続する VPN Server のポート 443 において接続を待ち受ける設定になっている必要があります。)\r\n不明な場合は、システム管理者またはネットワーク管理者にお問い合わせください。
+CM_HTTP_HEADER_COLUMN_0	Name
+CM_HTTP_HEADER_COLUMN_1	Value
 CM_PASSWORD_CHANGED		パスワードが変更されました。
 CM_ACCOUNT_SETTING_FILE	接続設定ファイル (*.VPN)|*.vpn|すべてのファイル (*.*)|*.*
 CM_ACCOUNT_SAVE_TITLE	エクスポート先の接続設定ファイル名を入力してください。
@@ -2338,10 +2340,20 @@ STATIC2					ホスト名(&H):
 STATIC3					ポート番号(&A):
 STATIC4					ユーザー名(&U):
 STATIC5					パスワード(&P):
+B_HTTP_HEADER			Custom HTTP header values
 IDOK					&OK
 IDCANCEL				キャンセル
 STATIC6					(オプション)
 STATIC7					(オプション)
+
+
+PREFIX					D_CM_PROXY_HTTP_HEADER
+CAPTION					Custom Proxy HTTP Header Values
+B_NEW					New
+B_DELETE				Delete
+B_CLEAR					Clear
+IDOK					&OK
+IDCANCEL				Cancel
 
 
 PREFIX					D_CM_DETAIL
@@ -5316,6 +5328,35 @@ CMD_CascadeProxyNone_Args	CascadeProxyNone [name]
 CMD_CascadeProxyNone_[name]	設定を変更するカスケード接続の名前を指定します。
 
 
+# CascadeProxyHeader* commands
+CMD_CascadeProxyHeader_Prompt_Name	Value name (part before the colon): 
+CMD_CascadeProxyHeader_Prompt_Data	Value data (part after the colon): 
+
+
+# CascadeProxyHeaderAdd command
+CMD_CascadeProxyHeaderAdd	Add a custom value in the HTTP header sent to the proxy server
+CMD_CascadeProxyHeaderAdd_Help	Use this to add a custom value in the HTTP header sent to the proxy server. A custom HTTP header can be used to bypass certain restrictions imposed on the network or to avoid speed limitations applied by the QoS.
+CMD_CascadeProxyHeaderAdd_Args	CascadeProxyHeaderAdd [name] [/NAME:name] [/DATA:data]
+CMD_CascadeProxyHeaderAdd_[name]	Specify the name of the Cascade Connection whose setting you want to change.
+CMD_CascadeProxyHeaderAdd_NAME	Specify the name of the custom value (the part before the colon character).
+CMD_CascadeProxyHeaderAdd_DATA	Specify the data of the custom value (the part after the colon character).
+
+
+# CascadeProxyHeaderDelete command
+CMD_CascadeProxyHeaderDelete	Delete a custom value in the HTTP header sent to the proxy server
+CMD_CascadeProxyHeaderDelete_Help	Use this to delete a custom value in the HTTP header sent to the proxy server. A custom HTTP header can be used to bypass certain restrictions imposed on the network or to avoid speed limitations applied by the QoS.
+CMD_CascadeProxyHeaderDelete_Args	CascadeProxyHeaderDelete [name] [/NAME:name]
+CMD_CascadeProxyHeaderDelete_[name]	Specify the name of the Cascade Connection whose setting you want to change.
+CMD_CascadeProxyHeaderDelete_NAME	Specify the name of the custom value (the part before the colon character).
+
+
+# CascadeProxyHeaderGet command
+CMD_CascadeProxyHeaderGet	Get the list of custom values in the HTTP header sent to the proxy server
+CMD_CascadeProxyHeaderGet_Help	Use this to get the list of custom values in the HTTP header sent to the proxy server. A custom HTTP header can be used to bypass certain restrictions imposed on the network or to avoid speed limitations applied by the QoS.
+CMD_CascadeProxyHeaderGet_Args	CascadeProxyHeaderGet [name]
+CMD_CascadeProxyHeaderGet_[name]	Specify the name of the Cascade Connection whose setting you want to get.
+
+
 # CascadeProxyHttp コマンド
 CMD_CascadeProxyHttp	カスケード接続の接続方法を HTTP プロキシサーバー経由接続に設定
 CMD_CascadeProxyHttp_Help	現在管理している仮想 HUB に登録されているカスケード接続を指定し、そのカスケード接続が VPN Server に対して接続する際に、使用する接続方法を [HTTP プロキシサーバー経由接続] に設定し、経由する HTTP プロキシサーバーのホスト名とポート番号、ユーザー名とパスワード (必要な場合) を指定します。\n経由する HTTP サーバーは、HTTPS 通信をするための CONNECT メソッドに対応している必要があります。\nこのコマンドは、クラスタとして動作している VPN Server の仮想 HUB では実行できません。
@@ -6606,6 +6647,35 @@ CMD_AccountProxyNone	接続設定の接続方法を直接 TCP/IP 接続に設定
 CMD_AccountProxyNone_Help	VPN Client に登録されている接続設定を指定し、その接続設定が VPN Server に対して接続する際に使用する接続方法を [直接 TCP/IP 接続] に設定し、プロキシサーバーを経由しないようにします。
 CMD_AccountProxyNone_Args	AccountProxyNone [name]
 CMD_AccountProxyNone_[name]	設定を変更する接続設定の名前を指定します。
+
+
+# AccountProxyHeader* commands
+CMD_AccountProxyHeader_Prompt_Name	Value name (part before the colon): 
+CMD_AccountProxyHeader_Prompt_Data	Value data (part after the colon): 
+
+
+# AccountProxyHeaderAdd command
+CMD_AccountProxyHeaderAdd	Add a custom value in the HTTP header sent to the proxy server
+CMD_AccountProxyHeaderAdd_Help	Use this to add a custom value in the HTTP header sent to the proxy server. A custom HTTP header can be used to bypass certain restrictions imposed on the network or to avoid speed limitations applied by the QoS.
+CMD_AccountProxyHeaderAdd_Args	AccountProxyHeaderAdd [name] [/NAME:name] [/DATA:data]
+CMD_AccountProxyHeaderAdd_[name]	Specify the name of the VPN Connection Setting whose setting you want to change.
+CMD_AccountProxyHeaderAdd_NAME	Specify the name of the custom value (the part before the colon character).
+CMD_AccountProxyHeaderAdd_DATA	Specify the data of the custom value (the part after the colon character).
+
+
+# AccountProxyHeaderDelete command
+CMD_AccountProxyHeaderDelete	Delete a custom value in the HTTP header sent to the proxy server
+CMD_AccountProxyHeaderDelete_Help	Use this to delete a custom value in the HTTP header sent to the proxy server. A custom HTTP header can be used to bypass certain restrictions imposed on the network or to avoid speed limitations applied by the QoS.
+CMD_AccountProxyHeaderDelete_Args	AccountProxyHeaderDelete [name] [/NAME:name]
+CMD_AccountProxyHeaderDelete_[name]	Specify the name of the VPN Connection Setting whose setting you want to change.
+CMD_AccountProxyHeaderDelete_NAME	Specify the name of the custom value (the part before the colon character).
+
+
+# AccountProxyHeaderGet command
+CMD_AccountProxyHeaderGet	Get the list of custom values in the HTTP header sent to the proxy server
+CMD_AccountProxyHeaderGet_Help	Use this to get the list of custom values in the HTTP header sent to the proxy server. A custom HTTP header can be used to bypass certain restrictions imposed on the network or to avoid speed limitations applied by the QoS.
+CMD_AccountProxyHeaderGet_Args	AccountProxyHeaderGet [name]
+CMD_AccountProxyHeaderGet_[name]	Specify the name of the VPN Connection Setting whose setting you want to get.
 
 
 # AccountProxyHttp コマンド

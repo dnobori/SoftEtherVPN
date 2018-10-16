@@ -153,6 +153,9 @@
 #include "EMInner.h"
 #include "../PenCore/resource.h"
 
+HWND edit_box = NULL;
+UINT current_item = 0;
+UINT current_subitem = 0;
 
 // Get the proxy server settings from the registry string of IE
 bool CmGetProxyServerNameAndPortFromIeProxyRegStr(char *name, UINT name_size, UINT *port, char *str, char *server_type)
@@ -7824,6 +7827,253 @@ UINT CmEditAccountDlgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam, voi
 	return 0;
 }
 
+// Update the custom proxy HTTP header dialog
+void CmProxyHttpHeaderDlgUpdate(HWND hWnd)
+{
+	UINT i = 0;
+	bool ok = true;
+	HWND values_list;
+	// Validate arguments
+	if (hWnd == NULL)
+	{
+		return;
+	}
+
+	values_list = DlgItem(hWnd, L_VALUES_LIST);
+	
+	for (; i < LvNum(values_list, 0); i++)
+	{
+		wchar_t *str = LvGetStr(values_list, 0, i, 0);
+		if (IsEmptyUniStr(str))
+		{
+			Free(str);
+			ok = false;
+			break;
+		}
+
+		Free(str);
+	}
+
+	SetEnable(hWnd, IDOK, ok);
+}
+
+// Update the custom proxy HTTP header dialog content
+void CmProxyHttpHeaderDlgRefresh(HWND hWnd, CLIENT_OPTION *a)
+{
+	UINT i = 0;
+	LIST *list;
+	LVB *b;
+	// Validate arguments
+	if (hWnd == NULL || a == NULL)
+	{
+		return;
+	}
+
+	list = NewEntryList(a->ProxyHttpHeader, ";", ":");
+
+	b = LvInsertStart();
+
+	for (; i < LIST_NUM(list); i++)
+	{
+		INI_ENTRY *e = LIST_DATA(list, i);
+		wchar_t *name = CopyStrToUni(e->Key);
+		wchar_t *value = CopyStrToUni(e->Value);
+		UniTrimLeft(value);
+
+		LvInsertAdd(b, 0, NULL, 2, name, value);
+
+		Free(name);
+		Free(value);
+	}
+
+	LvInsertEnd(b, hWnd, L_VALUES_LIST);
+	FreeEntryList(list);
+}
+
+// Initialize the custom proxy HTTP header dialog
+void CmProxyHttpHeaderDlgInit(HWND hWnd, CLIENT_OPTION *a)
+{
+	// Validate arguments
+	if (hWnd == NULL || a == NULL)
+	{
+		return;
+	}
+	
+	LvSetEnhanced(hWnd, L_VALUES_LIST, true);
+	LvInitEx(hWnd, L_VALUES_LIST, true);
+	LvInsertColumn(hWnd, L_VALUES_LIST, 0, _UU("CM_HTTP_HEADER_COLUMN_0"), 150);
+	LvInsertColumn(hWnd, L_VALUES_LIST, 1, _UU("CM_HTTP_HEADER_COLUMN_1"), 150);
+
+	LvSetStyle(hWnd, L_VALUES_LIST, LVS_EX_GRIDLINES);
+
+	CmProxyHttpHeaderDlgRefresh(hWnd, a);
+}
+
+// Custom proxy HTTP header dialog control
+UINT CmProxyHttpHeaderDlgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam, void *param)
+{
+	CLIENT_OPTION *a = (CLIENT_OPTION *)param;
+	UINT i = INFINITE;
+	// Validate arguments
+	if (hWnd == NULL || a == NULL)
+	{
+		return 0;
+	}
+
+	switch (msg)
+	{
+	case WM_INITDIALOG:
+		CmProxyHttpHeaderDlgInit(hWnd, a);
+		break;
+	case WM_CLOSE:
+		EndDialog(hWnd, false);
+		break;
+	case WM_NOTIFY:
+	{
+		switch (((LPNMHDR)lParam)->code)
+		{
+		// Header divider being dragged (resizing columns)
+		case HDN_ITEMCHANGINGW:
+			if (edit_box != NULL)
+			{
+				RECT rect;
+				ListView_GetSubItemRect(DlgItem(hWnd, L_VALUES_LIST), current_item, current_subitem, LVIR_LABEL, &rect);
+				MoveWindow(edit_box, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, true);
+				RedrawWindow(edit_box, NULL, NULL, RDW_ERASE | RDW_INVALIDATE | RDW_UPDATENOW);
+			}
+			break;
+		case LVN_ITEMCHANGED:
+			if (((LPNMHDR)lParam)->idFrom == L_VALUES_LIST)
+			{
+				CmProxyHttpHeaderDlgUpdate(hWnd);
+			}
+			break;
+		case NM_CLICK:
+			if (edit_box != NULL)
+			{
+				DestroyWindow(edit_box);
+			}
+			break;
+		case NM_DBLCLK:
+		{
+			RECT rect;
+			LPNMLISTVIEW list_view = (LPNMLISTVIEW)lParam;
+			wchar_t *str = LvGetStr(DlgItem(hWnd, L_VALUES_LIST), 0, current_item, current_subitem);
+			current_item = list_view->iItem;
+			current_subitem = list_view->iSubItem;
+			ListView_GetSubItemRect(DlgItem(hWnd, L_VALUES_LIST), current_item, current_subitem, LVIR_LABEL, &rect);
+
+			edit_box = CreateWindowExW(0, L"EDIT", str, WS_BORDER | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | ES_LEFT | ES_MULTILINE | ES_WANTRETURN, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, DlgItem(hWnd, L_VALUES_LIST), NULL, GetModuleHandle(NULL), NULL);
+			Free(str);
+
+			DlgFont(edit_box, 0, 8, false);
+			EditBoxSetEnhanced(edit_box, 0, true);
+			SetFocus(edit_box);
+			break;
+		}
+		case NM_RETURN:
+			if (edit_box != NULL)
+			{
+				if (GetFocus() == edit_box)
+				{
+					wchar_t *new_name = GetText(edit_box, 0);
+					wchar_t *old_name = LvGetStr(hWnd, L_VALUES_LIST, current_item, current_subitem);
+
+					if (old_name != NULL)
+					{
+						if (UniStrCmp(new_name, old_name) != 0 && UniIsEmptyStr(new_name) == false)
+						{
+							LvSetItem(hWnd, L_VALUES_LIST, current_item, current_subitem, new_name);
+						}
+
+						Free(old_name);
+					}
+
+					Free(new_name);
+				}
+
+				DestroyWindow(edit_box);
+			}
+		}
+		break;
+	}
+	case WM_COMMAND:
+		switch (wParam)
+		{
+		case B_NEW:
+			i = LvInsertItem(hWnd, L_VALUES_LIST, 0, NULL, L"");
+			LvSelect(hWnd, L_VALUES_LIST, i);
+			break;
+		case B_DELETE:
+			i = LvGetSelected(hWnd, L_VALUES_LIST);
+			if (i != INFINITE)
+			{
+				LvDeleteItem(hWnd, L_VALUES_LIST, i);
+			}
+			CmProxyHttpHeaderDlgUpdate(hWnd);
+			break;
+		case B_CLEAR:
+			LvReset(hWnd, L_VALUES_LIST);
+			CmProxyHttpHeaderDlgUpdate(hWnd);
+			break;
+		case IDOK:
+		{
+			UINT index = 0;
+			char *name = NULL;
+			char *value = NULL;
+			char http_header[HTTP_CUSTOM_HEADER_MAX_SIZE];
+
+			Zero(http_header, sizeof(http_header));
+			i = LvNum(hWnd, L_VALUES_LIST);
+
+			for (; index < i; index++)
+			{
+				char str[HTTP_CUSTOM_HEADER_MAX_SIZE];
+				name = LvGetStrA(hWnd, L_VALUES_LIST, index, 0);
+				value = LvGetStrA(hWnd, L_VALUES_LIST, index, 1);
+
+				Format(str, sizeof(str), "%s: %s;", name, value);
+
+				Free(name);
+				Free(value);
+
+				if ((StrLen(http_header) + StrLen(str)) <= sizeof(a->ProxyHttpHeader))
+				{
+					StrCat(http_header, sizeof(str), str);
+				}
+				else
+				{
+					MsgBox(hWnd, MB_ICONEXCLAMATION | MB_OK, _E(ERR_TOO_MANT_ITEMS));
+					return 1;
+				}
+			}
+
+			Zero(a->ProxyHttpHeader, sizeof(a->ProxyHttpHeader));
+			StrCpy(a->ProxyHttpHeader, sizeof(a->ProxyHttpHeader), http_header);
+
+			EndDialog(hWnd, true);
+			break;
+		}
+		case IDCANCEL:
+			Close(hWnd);
+		}
+	}
+
+	return 0;
+}
+
+// Custom proxy HTTP header dialog
+bool CmProxyHttpHeaderDlg(HWND hWnd, CLIENT_OPTION *a)
+{
+	// Validate arguments
+	if (a == NULL)
+	{
+		return false;
+	}
+
+	return Dialog(hWnd, D_CM_PROXY_HTTP_HEADER, CmProxyHttpHeaderDlgProc, a);
+}
+
 // Update the proxy server settings
 void CmProxyDlgUpdate(HWND hWnd, CLIENT_OPTION *a)
 {
@@ -7833,6 +8083,8 @@ void CmProxyDlgUpdate(HWND hWnd, CLIENT_OPTION *a)
 	{
 		return;
 	}
+
+	SetEnable(hWnd, B_HTTP_HEADER, a->ProxyType == PROXY_HTTP);
 
 	if (IsEmpty(hWnd, E_HOSTNAME))
 	{
@@ -7897,6 +8149,9 @@ UINT CmProxyDlgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam, void *par
 
 		switch (wParam)
 		{
+		case B_HTTP_HEADER:
+			CmProxyHttpHeaderDlg(hWnd, a);
+			break;
 		case IDOK:
 			GetTxtA(hWnd, E_HOSTNAME, a->ProxyName, sizeof(a->ProxyName));
 			GetTxtA(hWnd, E_USERNAME, a->ProxyUsername, sizeof(a->ProxyUsername));

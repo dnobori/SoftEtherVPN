@@ -4424,6 +4424,7 @@ void InRpcClientOption(CLIENT_OPTION *c, PACK *p)
 	PackGetStr(p, "ProxyName", c->ProxyName, sizeof(c->ProxyName));
 	PackGetStr(p, "ProxyUsername", c->ProxyUsername, sizeof(c->ProxyUsername));
 	PackGetStr(p, "ProxyPassword", c->ProxyPassword, sizeof(c->ProxyPassword));
+	PackGetStr(p, "ProxyHttpHeader", c->ProxyHttpHeader, sizeof(c->ProxyHttpHeader));
 	PackGetStr(p, "HubName", c->HubName, sizeof(c->HubName));
 	PackGetStr(p, "DeviceName", c->DeviceName, sizeof(c->DeviceName));
 	c->UseEncrypt = PackGetInt(p, "UseEncrypt") ? true : false;
@@ -4449,6 +4450,7 @@ void OutRpcClientOption(PACK *p, CLIENT_OPTION *c)
 	PackAddStr(p, "ProxyName", c->ProxyName);
 	PackAddStr(p, "ProxyUsername", c->ProxyUsername);
 	PackAddStr(p, "ProxyPassword", c->ProxyPassword);
+	PackAddStr(p, "ProxyHttpHeader", c->ProxyHttpHeader);
 	PackAddStr(p, "HubName", c->HubName);
 	PackAddStr(p, "DeviceName", c->DeviceName);
 	PackAddInt(p, "Port", c->Port);
@@ -9404,6 +9406,7 @@ CLIENT_OPTION *CiLoadClientOption(FOLDER *f)
 	StrCpy(o->ProxyPassword, sizeof(o->ProxyPassword), s);
 	Free(s);
 	FreeBuf(b);
+	CfgGetStr(f, "ProxyHttpHeader", o->ProxyHttpHeader, sizeof(o->ProxyHttpHeader));
 	o->NumRetry = CfgGetInt(f, "NumRetry");
 	o->RetryInterval = CfgGetInt(f, "RetryInterval");
 	CfgGetStr(f, "HubName", o->HubName, sizeof(o->HubName));
@@ -9938,6 +9941,7 @@ void CiWriteClientOption(FOLDER *f, CLIENT_OPTION *o)
 	b = EncryptPassword(o->ProxyPassword);
 	CfgAddByte(f, "ProxyPassword", b->Buf, b->Size);
 	FreeBuf(b);
+	CfgAddStr(f, "ProxyHttpHeader", o->ProxyHttpHeader);
 	CfgAddInt(f, "NumRetry", o->NumRetry);
 	CfgAddInt(f, "RetryInterval", o->RetryInterval);
 	CfgAddStr(f, "HubName", o->HubName);

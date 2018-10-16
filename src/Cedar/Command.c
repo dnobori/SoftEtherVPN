@@ -3054,6 +3054,9 @@ void PcMain(PC *pc)
 			{"AccountEncryptEnable", PcAccountEncryptEnable},
 			{"AccountCompressEnable", PcAccountCompressEnable},
 			{"AccountCompressDisable", PcAccountCompressDisable},
+			{"AccountProxyHeaderAdd", PcAccountProxyHeaderAdd},
+			{"AccountProxyHeaderDelete", PcAccountProxyHeaderDelete},
+			{"AccountProxyHeaderGet", PcAccountProxyHeaderGet},
 			{"AccountProxyNone", PcAccountProxyNone},
 			{"AccountProxyHttp", PcAccountProxyHttp},
 			{"AccountProxySocks", PcAccountProxySocks},
@@ -5163,6 +5166,220 @@ UINT PcAccountProxyNone(CONSOLE *c, char *cmd_name, wchar_t *str, void *param)
 
 	// Release of the parameter list
 	FreeParamValueList(o);
+
+	return ret;
+}
+
+UINT PcAccountProxyHeaderAdd(CONSOLE *c, char *cmd_name, wchar_t *str, void *param)
+{
+	LIST *o;
+	PC *pc = (PC *)param;
+	UINT ret = ERR_NO_ERROR;
+	RPC_CLIENT_GET_ACCOUNT t;
+
+	// Parameter list that can be specified
+	PARAM args[] =
+	{
+		{"[name]", CmdPrompt, _UU("CMD_AccountCreate_Prompt_Name"), CmdEvalNotEmpty, NULL},
+		{"NAME", CmdPrompt, _UU("CMD_AccountProxyHeader_Prompt_Name"), CmdEvalNotEmpty, NULL},
+		{"DATA", CmdPrompt, _UU("CMD_AccountProxyHeader_Prompt_Data"), NULL, NULL},
+	};
+
+	// Get the parameter list
+	o = ParseCommandList(c, cmd_name, str, args, sizeof(args) / sizeof(args[0]));
+	if (o == NULL)
+	{
+		return ERR_INVALID_PARAMETER;
+	}
+
+	// RPC call
+	Zero(&t, sizeof(t));
+	UniStrCpy(t.AccountName, sizeof(t.AccountName), GetParamUniStr(o, "[name]"));
+	ret = CcGetAccount(pc->RemoteClient, &t);
+
+	if (ret == ERR_NO_ERROR)
+	{
+		UINT i = 0;
+		TOKEN_LIST *tokens = NULL;
+		bool already_exists = false;
+		char *name = GetParamStr(o, "NAME");
+
+		tokens = ParseToken(t.ClientOption->ProxyHttpHeader, ";");
+
+		for (i = 0; i < tokens->NumTokens; i++)
+		{
+			if (StartWith(tokens->Token[i], name))
+			{
+				already_exists = true;
+				break;
+			}
+		}
+
+		if (already_exists == false)
+		{
+			RPC_CLIENT_CREATE_ACCOUNT z;
+			char s[HTTP_CUSTOM_HEADER_MAX_SIZE];
+
+			Format(s, sizeof(s), "%s: %s;", name, GetParamStr(o, "DATA"));
+
+			if ((StrLen(s) + StrLen(t.ClientOption->ProxyHttpHeader)) <= sizeof(t.ClientOption->ProxyHttpHeader)) {
+				StrCat(t.ClientOption->ProxyHttpHeader, sizeof(s), s);
+
+				Zero(&z, sizeof(z));
+				z.CheckServerCert = t.CheckServerCert;
+				z.RetryOnServerCert = t.RetryOnServerCert;
+				z.ClientAuth = t.ClientAuth;
+				z.ClientOption = t.ClientOption;
+				z.ServerCert = t.ServerCert;
+				z.StartupAccount = t.StartupAccount;
+
+				ret = CcSetAccount(pc->RemoteClient, &z);
+			}
+			else
+			{
+				ret = ERR_TOO_MANT_ITEMS;
+			}
+		}
+		else
+		{
+			ret = ERR_OBJECT_EXISTS;
+		}
+	}
+	else
+	{
+		// Error has occurred
+		CmdPrintError(c, ret);
+	}
+
+	CiFreeClientGetAccount(&t);
+
+	// Release of the parameter list
+	FreeParamValueList(o);
+
+	return ret;
+}
+
+UINT PcAccountProxyHeaderDelete(CONSOLE *c, char *cmd_name, wchar_t *str, void *param)
+{
+	PC *pc = (PC *)param;
+	UINT ret = ERR_NO_ERROR;
+	RPC_CLIENT_GET_ACCOUNT t;
+
+	// Parameter list that can be specified
+	PARAM args[] =
+	{
+		{"[name]", CmdPrompt, _UU("CMD_AccountCreate_Prompt_Name"), CmdEvalNotEmpty, NULL},
+		{"NAME", CmdPrompt, _UU("CMD_AccountProxyHeader_Prompt_Name"), CmdEvalNotEmpty, NULL},
+	};
+
+	// Get the parameter list
+	LIST *o = ParseCommandList(c, cmd_name, str, args, sizeof(args) / sizeof(args[0]));
+	if (o == NULL)
+	{
+		return ERR_INVALID_PARAMETER;
+	}
+
+	// RPC call
+	Zero(&t, sizeof(t));
+	UniStrCpy(t.AccountName, sizeof(t.AccountName), GetParamUniStr(o, "[name]"));
+	ret = CcGetAccount(pc->RemoteClient, &t);
+
+	if (ret == ERR_NO_ERROR)
+	{
+		UINT i = 0;
+		TOKEN_LIST *tokens = NULL;
+		RPC_CLIENT_CREATE_ACCOUNT z;
+		char *value = GetParamStr(o, "NAME");
+
+		Zero(&z, sizeof(z));
+		z.CheckServerCert = t.CheckServerCert;
+		z.RetryOnServerCert = t.RetryOnServerCert;
+		z.ClientAuth = t.ClientAuth;
+		z.ClientOption = t.ClientOption;
+		z.ServerCert = t.ServerCert;
+		z.StartupAccount = t.StartupAccount;
+
+		Zero(z.ClientOption->ProxyHttpHeader, sizeof(z.ClientOption->ProxyHttpHeader));
+
+		tokens = ParseToken(t.ClientOption->ProxyHttpHeader, ";");
+
+		for (i = 0; i < tokens->NumTokens; i++)
+		{
+			if (StartWith(tokens->Token[i], value) == false)
+			{
+				StrCat(z.ClientOption->ProxyHttpHeader, sizeof(z.ClientOption->ProxyHttpHeader), tokens->Token[i]);
+				StrCat(z.ClientOption->ProxyHttpHeader, 1, ";");
+			}
+		}
+
+		ret = CcSetAccount(pc->RemoteClient, &z);
+	}
+	else
+	{
+		// Error has occurred
+		CmdPrintError(c, ret);
+	}
+
+	CiFreeClientGetAccount(&t);
+
+	// Release of the parameter list
+	FreeParamValueList(o);
+
+	return ret;
+}
+
+UINT PcAccountProxyHeaderGet(CONSOLE *c, char *cmd_name, wchar_t *str, void *param)
+{
+	PC *pc = (PC *)param;
+	UINT ret = ERR_NO_ERROR;
+	RPC_CLIENT_GET_ACCOUNT t;
+
+	// Parameter list that can be specified
+	PARAM args[] =
+	{
+		{"[name]", CmdPrompt, _UU("CMD_AccountCreate_Prompt_Name"), CmdEvalNotEmpty, NULL},
+	};
+
+	// Get the parameter list
+	LIST *o = ParseCommandList(c, cmd_name, str, args, sizeof(args) / sizeof(args[0]));
+	if (o == NULL)
+	{
+		return ERR_INVALID_PARAMETER;
+	}
+
+	// RPC call
+	Zero(&t, sizeof(t));
+	UniStrCpy(t.AccountName, sizeof(t.AccountName), GetParamUniStr(o, "[name]"));
+	ret = CcGetAccount(pc->RemoteClient, &t);
+
+	// Release of the parameter list
+	FreeParamValueList(o);
+
+	if (ret == ERR_NO_ERROR)
+	{
+		wchar_t unistr[HTTP_CUSTOM_HEADER_MAX_SIZE];
+		TOKEN_LIST *tokens = NULL;
+		UINT i = 0;
+		CT *ct = CtNew();
+		CtInsertColumn(ct, _UU("CMD_CT_STD_COLUMN_1"), false);
+
+		tokens = ParseToken(t.ClientOption->ProxyHttpHeader, ";");
+
+		for (i = 0; i < tokens->NumTokens; i++)
+		{
+			StrToUni(unistr, sizeof(unistr), tokens->Token[i]);
+			CtInsert(ct, unistr);
+		}
+
+		CtFreeEx(ct, c, false);
+	}
+	else
+	{
+		// Error has occurred
+		CmdPrintError(c, ret);
+	}
+
+	CiFreeClientGetAccount(&t);
 
 	return ret;
 }
@@ -7401,6 +7618,9 @@ void PsMain(PS *ps)
 			{"CascadeCompressEnable", PsCascadeCompressEnable},
 			{"CascadeCompressDisable", PsCascadeCompressDisable},
 			{"CascadeProxyNone", PsCascadeProxyNone},
+			{"CascadeProxyHeaderAdd", PsCascadeProxyHeaderAdd},
+			{"CascadeProxyHeaderDelete", PsCascadeProxyHeaderDelete},
+			{"CascadeProxyHeaderGet", PsCascadeProxyHeaderGet},
 			{"CascadeProxyHttp", PsCascadeProxyHttp},
 			{"CascadeProxySocks", PsCascadeProxySocks},
 			{"CascadeServerCertEnable", PsCascadeServerCertEnable},
@@ -13564,6 +13784,232 @@ UINT PsCascadeProxyNone(CONSOLE *c, char *cmd_name, wchar_t *str, void *param)
 	FreeParamValueList(o);
 
 	return 0;
+}
+
+UINT PsCascadeProxyHeaderAdd(CONSOLE *c, char *cmd_name, wchar_t *str, void *param)
+{
+	LIST *o;
+	PS *ps = (PS *)param;
+	UINT ret = ERR_NO_ERROR;
+	RPC_CREATE_LINK t;
+
+	// Parameter list that can be specified
+	PARAM args[] =
+	{
+		// "name", prompt_proc, prompt_param, eval_proc, eval_param
+		{"[name]", CmdPrompt, _UU("CMD_CascadeCreate_Prompt_Name"), CmdEvalNotEmpty, NULL},
+		{"NAME", CmdPrompt, _UU("CMD_CascadeProxyHeader_Prompt_Name"), CmdEvalNotEmpty, NULL},
+		{"DATA", CmdPrompt, _UU("CMD_CascadeProxyHeader_Prompt_Data"), NULL, NULL},
+	};
+
+	// If virtual HUB is not selected, it's an error
+	if (ps->HubName == NULL)
+	{
+		c->Write(c, _UU("CMD_Hub_Not_Selected"));
+		return ERR_INVALID_PARAMETER;
+	}
+
+	// Get the parameter list
+	o = ParseCommandList(c, cmd_name, str, args, sizeof(args) / sizeof(args[0]));
+	if (o == NULL)
+	{
+		return ERR_INVALID_PARAMETER;
+	}
+
+	// RPC call
+	Zero(&t, sizeof(t));
+	StrCpy(t.HubName, sizeof(t.HubName), ps->HubName);
+	t.ClientOption = ZeroMalloc(sizeof(CLIENT_OPTION));
+	UniStrCpy(t.ClientOption->AccountName, sizeof(t.ClientOption->AccountName), GetParamUniStr(o, "[name]"));
+	ret = ScGetLink(ps->Rpc, &t);
+
+	if (ret == ERR_NO_ERROR)
+	{
+		UINT i = 0;
+		TOKEN_LIST *tokens = NULL;
+		char *name = GetParamStr(o, "NAME");
+		bool already_exists = false;
+
+		tokens = ParseToken(t.ClientOption->ProxyHttpHeader, ";");
+
+		for (i = 0; i < tokens->NumTokens; i++)
+		{
+			if (StartWith(tokens->Token[i], name))
+			{
+				already_exists = true;
+				break;
+			}
+		}
+
+		if (already_exists == false)
+		{
+			char s[HTTP_CUSTOM_HEADER_MAX_SIZE];
+			Format(s, sizeof(s), "%s: %s;", name, GetParamStr(o, "DATA"));
+
+			if ((StrLen(s) + StrLen(t.ClientOption->ProxyHttpHeader)) <= sizeof(t.ClientOption->ProxyHttpHeader)) {
+				StrCat(t.ClientOption->ProxyHttpHeader, sizeof(s), s);
+				ret = ScSetLink(ps->Rpc, &t);
+			}
+			else
+			{
+				ret = ERR_TOO_MANT_ITEMS;
+			}
+		}
+		else
+		{
+			ret = ERR_OBJECT_EXISTS;
+		}
+	}
+	else
+	{
+		// Error has occurred
+		CmdPrintError(c, ret);
+	}
+
+	FreeRpcCreateLink(&t);
+
+	// Release of the parameter list
+	FreeParamValueList(o);
+
+	return ret;
+}
+
+UINT PsCascadeProxyHeaderDelete(CONSOLE *c, char *cmd_name, wchar_t *str, void *param)
+{
+	LIST *o;
+	PS *ps = (PS *)param;
+	UINT ret = ERR_NO_ERROR;
+	RPC_CREATE_LINK t;
+
+	// Parameter list that can be specified
+	PARAM args[] =
+	{
+		// "name", prompt_proc, prompt_param, eval_proc, eval_param
+		{"[name]", CmdPrompt, _UU("CMD_CascadeCreate_Prompt_Name"), CmdEvalNotEmpty, NULL},
+		{"NAME", CmdPrompt, _UU("CMD_CascadeProxyHeader_Prompt_Name"), CmdEvalNotEmpty, NULL},
+	};
+
+	// If virtual HUB is not selected, it's an error
+	if (ps->HubName == NULL)
+	{
+		c->Write(c, _UU("CMD_Hub_Not_Selected"));
+		return ERR_INVALID_PARAMETER;
+	}
+
+	// Get the parameter list
+	o = ParseCommandList(c, cmd_name, str, args, sizeof(args) / sizeof(args[0]));
+	if (o == NULL)
+	{
+		return ERR_INVALID_PARAMETER;
+	}
+
+	// RPC call
+	Zero(&t, sizeof(t));
+	StrCpy(t.HubName, sizeof(t.HubName), ps->HubName);
+	t.ClientOption = ZeroMalloc(sizeof(CLIENT_OPTION));
+	UniStrCpy(t.ClientOption->AccountName, sizeof(t.ClientOption->AccountName), GetParamUniStr(o, "[name]"));
+	ret = ScGetLink(ps->Rpc, &t);
+
+	if (ret == ERR_NO_ERROR)
+	{
+		UINT i = 0;
+		TOKEN_LIST *tokens = NULL;
+		char *value = GetParamStr(o, "NAME");
+
+		Zero(t.ClientOption->ProxyHttpHeader, sizeof(t.ClientOption->ProxyHttpHeader));
+
+		tokens = ParseToken(t.ClientOption->ProxyHttpHeader, ";");
+
+		for (i = 0; i < tokens->NumTokens; i++)
+		{
+			if (StartWith(tokens->Token[i], value) == false)
+			{
+				StrCat(t.ClientOption->ProxyHttpHeader, sizeof(t.ClientOption->ProxyHttpHeader), tokens->Token[i]);
+				StrCat(t.ClientOption->ProxyHttpHeader, 1, ";");
+			}
+		}
+
+		ret = ScSetLink(ps->Rpc, &t);
+	}
+	else
+	{
+		// Error has occurred
+		CmdPrintError(c, ret);
+	}
+
+	FreeRpcCreateLink(&t);
+
+	// Release of the parameter list
+	FreeParamValueList(o);
+
+	return ret;
+}
+
+UINT PsCascadeProxyHeaderGet(CONSOLE *c, char *cmd_name, wchar_t *str, void *param)
+{
+	LIST *o;
+	PS *ps = (PS *)param;
+	UINT ret = ERR_NO_ERROR;
+	RPC_CREATE_LINK t;
+
+	// Parameter list that can be specified
+	PARAM args[] =
+	{
+		// "name", prompt_proc, prompt_param, eval_proc, eval_param
+		{"[name]", CmdPrompt, _UU("CMD_CascadeCreate_Prompt_Name"), CmdEvalNotEmpty, NULL},
+	};
+
+	// If virtual HUB is not selected, it's an error
+	if (ps->HubName == NULL)
+	{
+		c->Write(c, _UU("CMD_Hub_Not_Selected"));
+		return ERR_INVALID_PARAMETER;
+	}
+
+	// Get the parameter list
+	o = ParseCommandList(c, cmd_name, str, args, sizeof(args) / sizeof(args[0]));
+	if (o == NULL)
+	{
+		return ERR_INVALID_PARAMETER;
+	}
+
+	// RPC call
+	Zero(&t, sizeof(t));
+	StrCpy(t.HubName, sizeof(t.HubName), ps->HubName);
+	t.ClientOption = ZeroMalloc(sizeof(CLIENT_OPTION));
+	UniStrCpy(t.ClientOption->AccountName, sizeof(t.ClientOption->AccountName), GetParamUniStr(o, "[name]"));
+	ret = ScGetLink(ps->Rpc, &t);
+
+	// Release of the parameter list
+	FreeParamValueList(o);
+
+	if (ret == ERR_NO_ERROR)
+	{
+		wchar_t unistr[HTTP_CUSTOM_HEADER_MAX_SIZE];
+		TOKEN_LIST *tokens = NULL;
+		UINT i = 0;
+		CT *ct = CtNew();
+		CtInsertColumn(ct, _UU("CMD_CT_STD_COLUMN_1"), false);
+
+		tokens = ParseToken(t.ClientOption->ProxyHttpHeader, ";");
+
+		for (i = 0; i < tokens->NumTokens; i++)
+		{
+			StrToUni(unistr, sizeof(unistr), tokens->Token[i]);
+			CtInsert(ct, unistr);
+		}
+
+		CtFreeEx(ct, c, false);
+	}
+	else
+	{
+		// Error has occurred
+		CmdPrintError(c, ret);
+	}
+
+	FreeRpcCreateLink(&t);
+
+	return ret;
 }
 
 // Set the cascade connection method as the mode via HTTP proxy server
